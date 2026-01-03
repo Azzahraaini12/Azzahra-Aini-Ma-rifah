@@ -1,0 +1,661 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "private_outputs": true,
+      "provenance": [],
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/Azzahraaini12/Azzahra-Aini-Ma-rifah/blob/master/Data%20Mining%2013\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "phRgrqKfF2Py"
+      },
+      "outputs": [],
+      "source": [
+        "# Instal library scraping Google Play ---\n",
+        "!pip install google-play-scraper\n",
+        "\n",
+        "# Import library yang dibutuhkan ---\n",
+        "from google_play_scraper import Sort, reviews\n",
+        "import pandas as pd\n",
+        "import time\n",
+        "\n",
+        "# App ID aplikasi (ambil dari URL Play Store, contoh: com.aci.viuit) ---\n",
+        "app_id = 'com.aci.viuit'\n",
+        "\n",
+        "# Inisialisasi list untuk menampung semua review ---\n",
+        "all_reviews = []\n",
+        "count = 0\n",
+        "target_count = 6577  # target jumlah ulasan\n",
+        "\n",
+        "print(\"Mulai scraping ulasan dari Google Play...\")\n",
+        "\n",
+        "# Looping ambil data bertahap ---\n",
+        "while len(all_reviews) < target_count:\n",
+        "    batch_reviews, _ = reviews(\n",
+        "        app_id,\n",
+        "        lang='id',               # bahasa ulasan (Indonesia)\n",
+        "        country='id',            # negara asal ulasan\n",
+        "        sort=Sort.NEWEST,        # urutkan dari terbaru\n",
+        "        count=200,               # ambil 200 ulasan per request (maksimum)\n",
+        "        filter_score_with=None   # ambil semua rating (1-5)\n",
+        "    )\n",
+        "\n",
+        "    # tambahkan batch ke total\n",
+        "    all_reviews.extend(batch_reviews)\n",
+        "    count += len(batch_reviews)\n",
+        "\n",
+        "    print(f\"✅ {count} ulasan terkumpul sejauh ini...\")\n",
+        "\n",
+        "    # jeda kecil agar tidak terlalu cepat (menghindari banned)\n",
+        "    time.sleep(1)\n",
+        "\n",
+        "    # hentikan jika sudah cukup\n",
+        "    if len(batch_reviews) == 0:\n",
+        "        print(\"Tidak ada lagi data tersedia.\")\n",
+        "        break\n",
+        "\n",
+        "# Potong sesuai target kalau lebih\n",
+        "all_reviews = all_reviews[:target_count]\n",
+        "\n",
+        "# Ubah ke DataFrame\n",
+        "df = pd.DataFrame(all_reviews)\n",
+        "\n",
+        "# Pilih kolom penting sesuai formatmu\n",
+        "df = df[['userName', 'userImage', 'content', 'score', 'at']]\n",
+        "\n",
+        "# Simpan hasil ke file Excel\n",
+        "df.to_excel('ulasan_aci_6577.xlsx', index=False)\n",
+        "print(f\"\\nSelesai! Total {len(df)} ulasan disimpan ke 'ulasan_aci_6577.xlsx'\")\n",
+        "\n",
+        "# Untuk pengguna Google Colab\n",
+        "from google.colab import files\n",
+        "files.download('ulasan_aci_6577.xlsx')"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# --- Instal library untuk preprocessing ---\n",
+        "!pip install pandas nltk Sastrawi\n",
+        "\n",
+        "# --- Import pustaka yang dibutuhkan ---\n",
+        "import pandas as pd\n",
+        "import re\n",
+        "import nltk\n",
+        "from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory\n",
+        "from Sastrawi.Stemmer.StemmerFactory import StemmerFactory\n",
+        "\n",
+        "nltk.download('punkt')\n",
+        "\n",
+        "# --- Baca data hasil scraping ---\n",
+        "df = pd.read_excel('ulasan_aci_6577.xlsx')\n",
+        "\n",
+        "# --- Pastikan kolom teks berbentuk string ---\n",
+        "df['content'] = df['content'].astype(str)\n",
+        "\n",
+        "# --- Inisialisasi stopword remover dan stemmer Bahasa Indonesia ---\n",
+        "stopword = StopWordRemoverFactory().create_stop_word_remover()\n",
+        "stemmer = StemmerFactory().create_stemmer()\n",
+        "\n",
+        "# --- Fungsi untuk membersihkan teks ---\n",
+        "def clean_text(text):\n",
+        "    text = text.lower()                           # 1. ubah ke huruf kecil\n",
+        "    text = re.sub(r'[^a-zA-Z\\s]', '', text)       # 2. hapus angka/simbol/tanda baca\n",
+        "    text = stopword.remove(text)                  # 3. hapus kata tidak penting (stopword)\n",
+        "    text = stemmer.stem(text)                     # 4. ubah ke bentuk dasar (stemming)\n",
+        "    return text\n",
+        "\n",
+        "# --- Terapkan pembersihan pada setiap ulasan ---\n",
+        "df['cleaned'] = df['content'].apply(clean_text)\n",
+        "\n",
+        "# --- Simpan hasil pembersihan ---\n",
+        "df.to_excel('ulasan_aci_cleaned.xlsx', index=False)\n",
+        "print(\"✅ Data hasil preprocessing disimpan ke ulasan_aci_cleaned.xlsx\")"
+      ],
+      "metadata": {
+        "id": "83c2jn20GwMk"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from google.colab import files\n",
+        "files.download('ulasan_aci_cleaned.xlsx')"
+      ],
+      "metadata": {
+        "id": "mOgnMcQzHgYU"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# --- Instal dan import library ---\n",
+        "!pip install nltk pandas\n",
+        "import pandas as pd\n",
+        "import nltk\n",
+        "from nltk.tokenize import word_tokenize\n",
+        "\n",
+        "# --- Download model tokenisasi ---\n",
+        "nltk.download('punkt')\n",
+        "nltk.download('punkt_tab')\n",
+        "\n",
+        "# --- Baca file hasil preprocessing ---\n",
+        "df = pd.read_excel('ulasan_aci_cleaned.xlsx')\n",
+        "\n",
+        "# --- Pastikan kolom teks bertipe string ---\n",
+        "df['cleaned'] = df['cleaned'].astype(str)\n",
+        "\n",
+        "# --- Fungsi tokenisasi ---\n",
+        "def tokenize_text(text):\n",
+        "    return word_tokenize(text)\n",
+        "\n",
+        "# --- Terapkan tokenisasi ke setiap baris ---\n",
+        "df['tokens'] = df['cleaned'].apply(tokenize_text)\n",
+        "\n",
+        "# --- Simpan hasilnya ke file Excel ---\n",
+        "df.to_excel('ulasan_aci_tokenized.xlsx', index=False)\n",
+        "print(\"✅ File hasil tokenisasi disimpan ke ulasan_aci_tokenized.xlsx\")\n",
+        "\n",
+        "# --- Download ke komputer ---\n",
+        "from google.colab import files\n",
+        "files.download('ulasan_aci_tokenized.xlsx')"
+      ],
+      "metadata": {
+        "id": "9hEwMsj7H-0K"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# --- Instal library pendukung ---\n",
+        "!pip install scikit-learn pandas openpyxl\n",
+        "\n",
+        "# --- Import pustaka utama ---\n",
+        "import pandas as pd\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn.naive_bayes import MultinomialNB\n",
+        "from sklearn.metrics import classification_report, confusion_matrix, accuracy_score\n",
+        "\n",
+        "# --- 1️⃣ Baca data hasil preprocessing ---\n",
+        "df = pd.read_excel('ulasan_aci_cleaned.xlsx')\n",
+        "df = df[['content','cleaned','score']]\n",
+        "\n",
+        "# --- 2️⃣ Kategorikan label sentimen ---\n",
+        "def label_sentimen(score):\n",
+        "    if score >= 4:\n",
+        "        return 'positif'\n",
+        "    elif score == 3:\n",
+        "        return 'netral'\n",
+        "    else:\n",
+        "        return 'negatif'\n",
+        "\n",
+        "df['label'] = df['score'].apply(label_sentimen)\n",
+        "\n",
+        "# --- 🔧 Hapus data kosong ---\n",
+        "df['cleaned'] = df['cleaned'].astype(str)\n",
+        "df = df.dropna(subset=['cleaned'])\n",
+        "df = df[df['cleaned'].str.strip() != '']\n",
+        "\n",
+        "print(\"Jumlah data setelah dibersihkan:\", len(df))\n",
+        "print(df['label'].value_counts())\n",
+        "\n",
+        "# --- 3️⃣ Pisahkan data training & testing ---\n",
+        "X_train, X_test, y_train, y_test, score_train, score_test= train_test_split(\n",
+        "    df['cleaned'], df['label'], df['score'], test_size=0.2, random_state=42, stratify=df['label']\n",
+        ")\n",
+        "\n",
+        "# --- 4️⃣ Ubah teks ke bentuk numerik dengan TF-IDF ---\n",
+        "tfidf = TfidfVectorizer(max_features=5000)\n",
+        "X_train_tfidf = tfidf.fit_transform(X_train)\n",
+        "X_test_tfidf  = tfidf.transform(X_test)\n",
+        "\n",
+        "# --- 5️⃣ Latih model Naïve Bayes ---\n",
+        "model = MultinomialNB()\n",
+        "model.fit(X_train_tfidf, y_train)\n",
+        "\n",
+        "# --- 6️⃣ Evaluasi model ---\n",
+        "y_pred = model.predict(X_test_tfidf)\n",
+        "\n",
+        "# --- 7️⃣ Simpan hasil prediksi ke file Excel ---\n",
+        "hasil = pd.DataFrame({'Teks_Asli': X_test, 'Score_Asli': score_test, 'Label_Asli': y_test, 'Prediksi': y_pred})\n",
+        "hasil.to_excel('hasil_sentimen_aci.xlsx', index=False)\n",
+        "print(\"✅ Hasil analisis disimpan ke hasil_sentimen_aci.xlsx\")\n",
+        "\n",
+        "# --- 8️⃣ Hitung GAP (wajib ada score) ---\n",
+        "def score_from_label(label):\n",
+        "    if label == 'positif': return 5\n",
+        "    if label == 'netral': return 3\n",
+        "    return 1\n",
+        "\n",
+        "hasil['Score_Prediksi'] = hasil['Prediksi'].apply(score_from_label)\n",
+        "hasil['GAP'] = hasil['Score_Asli'] - hasil['Score_Prediksi']\n",
+        "\n",
+        "from google.colab import files\n",
+        "files.download('hasil_sentimen_aci.xlsx')\n",
+        "\n",
+        "print(\"🎯 Akurasi Model :\", accuracy_score(y_test, y_pred))\n",
+        "print(\"\\nConfusion Matrix:\\n\", confusion_matrix(y_test, y_pred))\n",
+        "print(\"\\nClassification Report:\\n\", classification_report(y_test, y_pred))"
+      ],
+      "metadata": {
+        "id": "E1Q0sKTmIn14"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Import pustaka yang diperlukan\n",
+        "import pandas as pd\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn.naive_bayes import MultinomialNB\n",
+        "from sklearn.metrics import accuracy_score, classification_report, confusion_matrix\n",
+        "import matplotlib.pyplot as plt\n",
+        "import seaborn as sns\n",
+        "\n",
+        "from google.colab import files\n",
+        "uploaded = files.upload()"
+      ],
+      "metadata": {
+        "id": "h-KVoCq2Jd8z"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\n",
+        "\n",
+        "# Ganti nama file sesuai yang kamu upload\n",
+        "df = pd.read_excel('hasil_sentimen_aci.xlsx')\n",
+        "\n",
+        "# Tampilkan beberapa baris pertama\n",
+        "df.head()"
+      ],
+      "metadata": {
+        "id": "wLbUfQAxJn2e"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(df.columns)\n"
+      ],
+      "metadata": {
+        "id": "bcKjGeK56XAN"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn.naive_bayes import MultinomialNB\n",
+        "from google.colab import files\n",
+        "\n",
+        "# =======================================================\n",
+        "# 1. BACA FILE\n",
+        "# =======================================================\n",
+        "df = pd.read_excel(\"/content/hasil_sentimen_aci.xlsx\")\n",
+        "\n",
+        "text_col = \"Teks_Asli\"\n",
+        "label_col = \"Label_Asli\"\n",
+        "Score_Asli = \"Score_Asli\"\n",
+        "\n",
+        "df[text_col] = df[text_col].astype(str)\n",
+        "df[label_col] = df[label_col].astype(str).str.lower()\n",
+        "\n",
+        "# =======================================================\n",
+        "# 2. TF-IDF + TRAIN FULL DATA\n",
+        "# =======================================================\n",
+        "tfidf = TfidfVectorizer(max_features=1000)\n",
+        "X = tfidf.fit_transform(df[text_col])\n",
+        "y = df[label_col]\n",
+        "\n",
+        "model = MultinomialNB()\n",
+        "model.fit(X, y)\n",
+        "\n",
+        "# =======================================================\n",
+        "# 3. PREDIKSI SELURUH DATA\n",
+        "# =======================================================\n",
+        "y_pred = model.predict(X)\n",
+        "prob = model.predict_proba(X)\n",
+        "kelas = model.classes_\n",
+        "\n",
+        "# =======================================================\n",
+        "# 4. BUAT DATAFRAME HASIL FINAL\n",
+        "# =======================================================\n",
+        "df_hasil = pd.DataFrame({\n",
+        "    \"Teks_Asli\": df[text_col],\n",
+        "    \"Label_Asli\": df[label_col],\n",
+        "    \"Score_Asli\": df[Score_Asli],\n",
+        "    \"Prediksi\": y_pred\n",
+        "})\n",
+        "\n",
+        "# Tambahkan Prob tiap kelas\n",
+        "for i, nama in enumerate(kelas):\n",
+        "    df_hasil[f\"Prob_{nama}\"] = prob[:, i]\n",
+        "\n",
+        "# =======================================================\n",
+        "# 5. SIMPAN\n",
+        "# =======================================================\n",
+        "output_path = \"/content/hasil_sentimen_fix.xlsx\"\n",
+        "df_hasil.to_excel(output_path, index=False)\n",
+        "\n",
+        "print(\"File berhasil disimpan:\", output_path)\n",
+        "files.download(output_path)\n"
+      ],
+      "metadata": {
+        "id": "qSeS3-otJ1BD"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ===== Perbaikan minimal: simpan probabilitas + teks + score untuk data uji =====\n",
+        "\n",
+        "# Pastikan variabel yang diperlukan sudah ada\n",
+        "required = ['model', 'X_test', 'y_test', 'y_pred', 'df', 'text_col']\n",
+        "missing = [v for v in required if v not in globals()]\n",
+        "if missing:\n",
+        "    raise NameError(f\"Variabel berikut belum ada: {missing}. Jalankan blok training / split dulu.\")\n",
+        "\n",
+        "# Pastikan kolom score ada (cek beberapa kemungkinan nama)\n",
+        "score_column_candidates = [\"Score_Asli\", \"score\", \"Score\", \"score_asli\"]\n",
+        "score_col = None\n",
+        "for c in score_column_candidates:\n",
+        "    if c in df.columns:\n",
+        "        score_col = c\n",
+        "        break\n",
+        "if score_col is None:\n",
+        "    raise KeyError(f\"Tidak ditemukan kolom score di df. Cari salah satu dari: {score_column_candidates}\")\n",
+        "\n",
+        "# Dapatkan probabilitas prediksi dari model Naive Bayes (hanya untuk data uji)\n",
+        "probabilitas = model.predict_proba(X_test)\n",
+        "\n",
+        "# Urutan kelas sesuai model\n",
+        "kelas = model.classes_   # contoh: ['negatif', 'netral', 'positif']\n",
+        "\n",
+        "# Ambil teks asli & skor dari DataFrame berdasarkan index test split\n",
+        "teks_test  = df.loc[y_test.index, text_col].values\n",
+        "score_test = df.loc[y_test.index, \"Score_Asli\"].values\n",
+        "\n",
+        "# Buat DataFrame hasil\n",
+        "hasil = pd.DataFrame({\n",
+        "    'Teks_Asli': teks_test,\n",
+        "    'Label_Asli': y_test.values,\n",
+        "    'Prediksi': y_pred,\n",
+        "    'score_col': score_test\n",
+        "})\n",
+        "\n",
+        "# Tambahkan kolom probabilitas sesuai nama kelas\n",
+        "for i, nama in enumerate(kelas):\n",
+        "    hasil[f\"Prob_{nama}\"] = probabilitas[:, i]\n",
+        "\n",
+        "# Simpan ke Excel\n",
+        "output_path = \"/content/hasil_sentimen_aci.xlsx\"\n",
+        "hasil.to_excel(output_path, index=False)\n",
+        "\n",
+        "from google.colab import files\n",
+        "files.download(output_path)\n"
+      ],
+      "metadata": {
+        "id": "LLoASOdEJ-fd"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================================\n",
+        "# 1. IMPORT LIBRARY\n",
+        "# ============================================================\n",
+        "import pandas as pd\n",
+        "import matplotlib.pyplot as plt\n"
+      ],
+      "metadata": {
+        "id": "IAIOvfRD2VUw"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from google.colab import files\n",
+        "uploaded = files.upload()\n"
+      ],
+      "metadata": {
+        "id": "xtkw9dCTqZv0"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================================\n",
+        "# 2. LOAD FILE HASIL SENTIMEN\n",
+        "# ============================================================\n",
+        "file_path = \"/content/hasil_sentimen_fix.xlsx\"  # Ubah jika perlu\n",
+        "df = pd.read_excel(file_path)"
+      ],
+      "metadata": {
+        "id": "KyAGl0W12XSB"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Tampilkan 5 baris pertama\n",
+        "df.head()\n"
+      ],
+      "metadata": {
+        "id": "L5rrMYfT2XPC"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================================\n",
+        "# 3. MAPPING Score_Asli -> Sentimen_Rating\n",
+        "# ============================================================\n",
+        "def map_rating(score):\n",
+        "    if score in [1, 2]:\n",
+        "        return \"negatif\"\n",
+        "    elif score == 3:\n",
+        "        return \"netral\"\n",
+        "    elif score in [4, 5]:\n",
+        "        return \"positif\"\n",
+        "    return \"netral\"  # fallback\n",
+        "\n",
+        "df[\"Sentimen_Rating\"] = df[\"Score_Asli\"].apply(map_rating)\n"
+      ],
+      "metadata": {
+        "id": "LTkIMyGH2XMj"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================================\n",
+        "# 4. HITUNG GAP (Prediksi ≠ Sentimen_Rating)\n",
+        "# ============================================================\n",
+        "df[\"GAP\"] = df[\"Prediksi\"] != df[\"Sentimen_Rating\"]\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "q3jPiu502XKA"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================================\n",
+        "# 5. HITUNG GAP PER SCORE\n",
+        "# ============================================================\n",
+        "gap_per_score = df.groupby(\"Score_Asli\")[\"GAP\"].sum()\n",
+        "count_per_score = df.groupby(\"Score_Asli\")[\"GAP\"].count()\n",
+        "percent_gap = (gap_per_score / count_per_score * 100).round(2)\n",
+        "\n",
+        "print(\"\\n=== TOTAL GAP PER SCORE ===\")\n",
+        "print(gap_per_score)\n",
+        "\n",
+        "print(\"\\n=== PERSENTASE GAP PER SCORE (%) ===\")\n",
+        "print(percent_gap)\n"
+      ],
+      "metadata": {
+        "id": "HU00QGOq2XHM"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================================\n",
+        "# 6. VISUALISASI GRAFIK\n",
+        "# ============================================================\n",
+        "\n",
+        "# ----------------------------\n",
+        "# Grafik 1 — Total GAP per Score\n",
+        "# ----------------------------\n",
+        "plt.figure(figsize=(8,5))\n",
+        "plt.bar(gap_per_score.index.astype(str), gap_per_score.values)\n",
+        "plt.xlabel(\"Score Aplikasi (1–5)\")\n",
+        "plt.ylabel(\"Jumlah GAP\")\n",
+        "plt.title(\"Total GAP antara Rating dan Hasil Sentimen\")\n",
+        "plt.tight_layout()\n",
+        "plt.show()"
+      ],
+      "metadata": {
+        "id": "hbjLmU8I2XEl"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ----------------------------\n",
+        "# Grafik 2 — Persentase GAP per Score\n",
+        "# ----------------------------\n",
+        "plt.figure(figsize=(8,5))\n",
+        "plt.bar(percent_gap.index.astype(str), percent_gap.values)\n",
+        "plt.xlabel(\"Score Aplikasi (1–5)\")\n",
+        "plt.ylabel(\"Persentase GAP (%)\")\n",
+        "plt.title(\"Persentase GAP per Score\")\n",
+        "plt.tight_layout()\n",
+        "plt.show()"
+      ],
+      "metadata": {
+        "id": "CNOJVCXW2XBh"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ----------------------------\n",
+        "# Grafik 3 — Pie Chart GAP vs Cocok\n",
+        "# ----------------------------\n",
+        "gap_count = df[\"GAP\"].value_counts()\n",
+        "labels = [\"Cocok\", \"GAP\"]\n",
+        "sizes = [gap_count.get(False, 0), gap_count.get(True, 0)]\n",
+        "\n",
+        "plt.figure(figsize=(6,6))\n",
+        "plt.pie(sizes, labels=labels, autopct=\"%1.1f%%\")\n",
+        "plt.title(\"Distribusi GAP vs Prediksi Cocok\")\n",
+        "plt.show()"
+      ],
+      "metadata": {
+        "id": "ZIyO6KFp2wM8"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================================\n",
+        "# 7. (OPSIONAL) TAMPILKAN DATA AKHIR\n",
+        "# ============================================================\n",
+        "df.head()"
+      ],
+      "metadata": {
+        "id": "16NHzuiW20Sw"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================================\n",
+        "# 8. SIMPAN DATA HASIL GAP KE EXCEL\n",
+        "# ============================================================\n",
+        "output_gap = \"/content/hasil_gap_sentimen.xlsx\"\n",
+        "df.to_excel(output_gap, index=False)\n",
+        "\n",
+        "print(\"File GAP berhasil disimpan sebagai:\", output_gap)\n",
+        "\n",
+        "from google.colab import files\n",
+        "files.download(output_gap)\n"
+      ],
+      "metadata": {
+        "id": "0SER2hIu3lmr"
+      },
+      "execution_count": null,
+      "outputs": []
+    }
+  ]
+}
